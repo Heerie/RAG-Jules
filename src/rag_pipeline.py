@@ -18,7 +18,7 @@ class RAGPipeline:
         self.config = RAGConfig(config_path)
 
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             handlers=[
                 logging.FileHandler(self.config.log_file),
@@ -188,10 +188,21 @@ class RAGPipeline:
         retrieved_chunks = vector_store.query_index(
             query, self.global_index, self.global_chunks, self.encoder_model, self.config
         )
+
         if not retrieved_chunks:
+            logger.warning("No relevant text chunks found for the query.")
             return "I could not find any relevant information in the text documents to answer your question."
 
+        # Diagnostic logging
+        logger.info(f"Retrieved {len(retrieved_chunks)} chunks for query: '{query}'")
+        for i, chunk in enumerate(retrieved_chunks):
+            logger.debug(f"  Chunk {i+1} (Score: {chunk['score']}):")
+            logger.debug(f"    Source: {chunk.get('source_info', 'N/A')}")
+            logger.debug(f"    Content: {chunk['content'][:150]}...")
+
         context = text_processing.aggregate_context(retrieved_chunks, self.config)
+        logger.debug(f"Aggregated context sent to LLM:\n{context}")
+
         return self.llm.synthesize_answer(query, context, chat_history)
 
     def _run_sql_query(self, query, chat_history):
