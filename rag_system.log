@@ -1,0 +1,3 @@
+2025-07-31 11:33:00,502 - src.rag_pipeline - INFO - Initializing RAG Pipeline...
+2025-07-31 11:33:00,503 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/all-MiniLM-L6-v2
+2025-07-31 11:33:08,561 - src.rag_pipeline - INFO - Embedding model loaded successfully.

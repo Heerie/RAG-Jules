@@ -1,0 +1,13 @@
+streamlit
+pandas
+numpy
+sentence-transformers
+torch
+faiss-cpu
+pdfplumber
+python-pptx
+google-generativeai
+python-dotenv
+fastapi
+uvicorn
+requests
