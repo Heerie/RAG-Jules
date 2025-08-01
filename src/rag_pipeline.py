@@ -242,6 +242,7 @@ class RAGPipeline:
 
         text_query = decomposed_queries["text_query"]
         sql_query_prompt = decomposed_queries["sql_query"]
+        logger.debug(f"Decomposed to text_query: '{text_query}' and sql_query: '{sql_query_prompt}'")
 
         # Run text query part
         text_results = vector_store.query_index(
@@ -250,8 +251,8 @@ class RAGPipeline:
         text_context = text_processing.aggregate_context(text_results, self.config)
 
         # Run SQL query part
+        sql_context = "No relevant information found in spreadsheets."
         target_table = self.llm.identify_target_sql_table(sql_query_prompt, self.table_metadata)
-        sql_context = ""
         if target_table and target_table in self.table_metadata:
             table_meta = self.table_metadata[target_table]
             sql_query = self.llm.generate_sql_query(sql_query_prompt, target_table, table_meta)
@@ -261,7 +262,9 @@ class RAGPipeline:
                     sql_context = f"Data from table '{target_table}':\n{sql_result}"
 
         # Combine contexts and synthesize final answer
-        combined_context = f"Information from text documents:\n{text_context}\n\nInformation from spreadsheets:\n{sql_context}"
+        combined_context = f"Here is the information I found to answer your query:\n\n### Information from Text Documents:\n{text_context if text_context else 'No relevant information found in text documents.'}\n\n### Information from Spreadsheets:\n{sql_context}"
+        logger.debug(f"Final combined context for hybrid query:\n{combined_context}")
+
         return self.llm.synthesize_answer(query, combined_context, chat_history)
 
     def __del__(self):

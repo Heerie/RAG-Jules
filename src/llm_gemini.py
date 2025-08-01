@@ -243,22 +243,33 @@ Standalone Query:
 
     def decompose_hybrid_query(self, query):
         prompt = f"""The user has asked a question that requires information from both text documents and a database.
-Your task is to decompose this query into two separate questions:
-1. A 'text_query' that can be answered by searching through text.
-2. A 'sql_query' that can be answered by querying a database.
+Your task is to decompose this query into two separate, specific questions:
+1. A 'text_query' for the part of the question that can be answered by searching through text. This should be a complete, self-contained question.
+2. A 'sql_query' for the part of the question that can be answered by querying a database. This should also be a complete, self-contained question.
 
-Original Query: "{query}"
+**Original Query:** "{query}"
 
-Respond ONLY in a valid JSON format with the keys "text_query" and "sql_query".
-Example:
-{{"text_query": "What are the project goals for SkyWatch?", "sql_query": "What is the total budget for the SkyWatch project?"}}
+**Example:**
+Original Query: "Summarize Project Alpha's goals and what is the budget for the 'Design Widgets' task?"
+Response:
+{{
+  "text_query": "What are the goals of Project Alpha?",
+  "sql_query": "What is the budget for the 'Design Widgets' task?"
+}}
+
+Respond ONLY in a valid, minified JSON format with the keys "text_query" and "sql_query".
 """
         raw_response = self._call_llm(prompt, temperature=0.0)
         if not raw_response:
             return None
 
         try:
-            return json.loads(raw_response)
+            # The response might be wrapped in markdown
+            json_match = re.search(r"\{.*\}", raw_response, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+            logger.error(f"Could not find JSON in decomposed query response: {raw_response}")
+            return None
         except json.JSONDecodeError:
             logger.error(f"Failed to parse decomposed query from Gemini: {raw_response}")
             return None
