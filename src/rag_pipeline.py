@@ -171,7 +171,7 @@ class RAGPipeline:
         refined_query = self.llm.refine_query_with_history(query, chat_history)
         logger.info(f"Refined query: '{refined_query[:100]}...'")
 
-        classification = self.llm.classify_query(refined_query)
+        classification = self.llm.classify_query(refined_query, self.table_metadata)
 
         if classification == 'text':
             return self._run_text_query(refined_query, chat_history)

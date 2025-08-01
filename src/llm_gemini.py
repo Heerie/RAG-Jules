@@ -85,29 +85,56 @@ Respond ONLY with a valid JSON object where keys are the exact column names and 
             logger.error(f"Could not find JSON object in Gemini response for metadata: {raw_response}")
             return None
 
-    def classify_query(self, query):
-        prompt = f"""Classify the user query into ONE of the following categories:
-1. 'text': For questions that can be answered from text documents (PDFs, PPTs).
-2. 'sql': For questions that require data from spreadsheets (CSV, XLSX), like calculations or filtering.
-3. 'hybrid': For questions that require information from both text and spreadsheets.
+    def classify_query(self, query, table_metadata):
+        """Classifies the user query as 'text', 'sql', or 'hybrid'."""
 
-Query: "{query}"
+        schema_overview = "None"
+        if table_metadata:
+            schema_overview = "Available SQL Tables:\n"
+            for table_name, meta in table_metadata.items():
+                col_descs = [f"`{col.get('name')}`" for col in meta.get('columns', [])]
+                schema_overview += f"- Table `{table_name}` (from file `{meta.get('source_file')}`) has columns: {', '.join(col_descs)}\n"
 
-Respond ONLY in JSON format with a "classification" key. Example:
-{{"classification": "sql"}}
+        prompt = f"""You are an expert query analyzer. Your task is to classify a user query into one of three categories: 'text', 'sql', or 'hybrid'.
+
+Here is the context you have:
+1.  A collection of text documents (like PDFs and PPTs).
+2.  A database with the following tables and schemas:
+{schema_overview}
+
+Classification Guidelines:
+- 'text': The query can likely be answered using only the text documents. It usually asks for descriptions, summaries, or qualitative information.
+- 'sql': The query requires structured data from the database tables. It often involves calculations (e.g., "total", "average"), specific numbers, or filtering on columns.
+- 'hybrid': The query requires information from BOTH text documents AND the database. For example, asking for a summary of a project (text) and its total budget (sql).
+
+User Query: "{query}"
+
+Analyze the query and the available table schemas. Respond ONLY with a valid JSON object containing the key "classification" and the value 'text', 'sql', or 'hybrid'.
+
+Example:
+Query: "What is the total budget for the alpha_data project?"
+Response: {{"classification": "sql"}}
+
+Query: "Summarize the goals of Project Alpha and what is its budget?"
+Response: {{"classification": "hybrid"}}
 """
+
         raw_response = self._call_llm(prompt, temperature=0.0)
         if not raw_response:
-            return "text" # Default classification
+            return "text"  # Default classification
 
         try:
-            result = json.loads(raw_response)
-            classification = result.get("classification")
-            if classification in ["text", "sql", "hybrid"]:
-                logger.info(f"Query classified as '{classification}'")
-                return classification
+            # The response might be wrapped in markdown
+            json_match = re.search(r"\{.*\}", raw_response, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group(0))
+                classification = result.get("classification")
+                if classification in ["text", "sql", "hybrid"]:
+                    logger.info(f"Query classified as '{classification}'")
+                    return classification
+            logger.warning(f"Could not parse classification JSON from Gemini: {raw_response}")
         except (json.JSONDecodeError, AttributeError):
-            logger.warning(f"Could not parse classification from Gemini: '{raw_response}'. Defaulting to 'text'.")
+            logger.warning(f"Failed to parse classification from Gemini: '{raw_response}'. Defaulting to 'text'.")
 
         return "text"
 
