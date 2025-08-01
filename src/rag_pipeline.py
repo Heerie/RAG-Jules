@@ -208,21 +208,27 @@ class RAGPipeline:
     def _run_sql_query(self, query, chat_history):
         logger.info("Running SQL query pipeline...")
         target_table = self.llm.identify_target_sql_table(query, self.table_metadata)
+        logger.debug(f"Identified target table: {target_table}")
 
         if not target_table or target_table not in self.table_metadata:
+            logger.warning("Could not identify a relevant spreadsheet table for the query.")
             return "I could not identify a relevant spreadsheet to answer your question."
 
         table_meta = self.table_metadata[target_table]
         sql_query = self.llm.generate_sql_query(query, target_table, table_meta)
+        logger.debug(f"Generated SQL query: {sql_query}")
 
         if not sql_query:
+            logger.warning("LLM failed to generate a SQL query.")
             return "I was unable to construct a SQL query to answer your question."
 
         sql_result, error = sql_database.execute_sql_query(self.db_conn, sql_query)
 
         if error:
+            logger.error(f"SQL execution error: {error}")
             return f"I encountered an error while querying the database: {error}"
 
+        logger.debug(f"SQL query result:\n{sql_result}")
         context = f"The following data was retrieved from the database table '{target_table}':\n\n{sql_result}"
         return self.llm.synthesize_answer(query, context, chat_history)
 

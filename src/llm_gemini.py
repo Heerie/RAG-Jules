@@ -164,18 +164,43 @@ Respond ONLY with the exact name of the single most appropriate table from {tabl
         for col in table_meta['columns']:
             schema_description += f"- \"{col['name']}\" (Type: {col.get('type', 'TEXT')}, Desc: {col.get('description', 'N/A')})\n"
 
-        prompt = f"""You are an expert SQLite query writer. Given a user query and table schema, write a valid SQLite query.
-Schema:
+        prompt = f"""You are an expert SQLite query writer. Your task is to write a single, valid SQLite query to answer the user's question based on the provided table schema.
+
+**Instructions:**
+- Respond ONLY with the SQLite query.
+- Do not include any explanations, markdown, or any text other than the query itself.
+- Use double quotes for column names.
+- If a calculation is needed, use the appropriate SQL aggregate function (e.g., SUM, AVG, COUNT).
+
+**Schema for table `{table_name}`:**
 {schema_description}
-User Query: "{query}"
-Respond ONLY with a single, valid SQLite SELECT query. Do not include any explanation or markdown.
+
+---
+**Examples:**
+
+User Query: "What is the total budget?"
+SQL Query: SELECT SUM("budget") FROM "{table_name}"
+
+User Query: "Show me all the tasks that are in progress."
+SQL Query: SELECT * FROM "{table_name}" WHERE "status" = 'in-progress'
+
+User Query: "how many subscribers did we have in february"
+SQL Query: SELECT "subscribers" FROM "{table_name}" WHERE "month" = 'Feb'
+---
+
+**User's Query:** "{query}"
+
+**SQL Query:**
 """
         response = self._call_llm(prompt, temperature=0.0)
         if response:
-            sql_query = re.sub(r"^```(?:sql)?\s*|\s*```$", "", response.strip(), flags=re.DOTALL)
+            # Clean up the response to get only the SQL
+            sql_query = response.strip()
             if sql_query.upper().startswith("SELECT"):
                 logger.info(f"Generated SQL for '{table_name}': {sql_query}")
                 return sql_query
+            else:
+                logger.warning(f"Generated response was not a valid SELECT query: {sql_query}")
         return None
 
     def synthesize_answer(self, query, context, chat_history):

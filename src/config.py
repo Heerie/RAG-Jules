@@ -18,7 +18,7 @@ class RAGConfig:
             },
             "MODELS": {
                 "encoder_model": "sentence-transformers/all-MiniLM-L6-v2",
-                "gemini_model": "gemini-1.5-flash",
+                "gemini_model": "gemini-1.5-pro",
                 "device": "auto",
             },
             "PARAMETERS": {
